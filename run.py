@@ -36,6 +36,13 @@ def process_image(image, face_mesh):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return face_mesh.process(image)
 
+def showInMovedWindow(winname, img, x, y):
+    # Create a named window
+    cv2.namedWindow(winname)
+    # Move it to (x,y)
+    cv2.moveWindow(winname, x, y)
+    cv2.imshow(winname,img)
+
 def estimateHeadPose(landmarks, face_model, camera, distortion, iteration=True):
     ret, rvec, tvec = cv2.solvePnP(face_model, landmarks, camera, distortion, flags=cv2.SOLVEPNP_EPNP)
 
@@ -80,23 +87,26 @@ def normalizeFace(img, face, hr, ht, camera_matrix):
     ])
     
     # z-axis
-    forward = (center/distance).reshape(3)
+    forward = (center).reshape(3)
 
     # x_r: x-axis of the head coordinate system
     hRx = hR[:,0]
     # y-axis
     down = np.cross(forward, hRx)
-    down /= np.linalg.norm(down)
+    # down /= np.linalg.norm(down)
     
     # x-axis
     right = np.cross(down, forward)
-    right /= np.linalg.norm(right)
+    # right /= np.linalg.norm(right)
 
     # rotation matrix R
-    R = np.c_[right, down, forward].T
+    R = np.c_[right/np.linalg.norm(right), down/np.linalg.norm(down), forward/distance].T
+    
+    # Transformation Matrix M (For 3D input)
+    M = np.dot(S, R)
 
-    # transformation matrix
-    W = np.dot(np.dot(cam_norm, S), np.dot(R, np.linalg.inv(camera_matrix))) 
+    # transformation matrix 
+    W = np.dot(cam_norm, np.dot(M, np.linalg.inv(camera_matrix)))
         
     # image normalization
     img_warped = cv2.warpPerspective(img, W, roiSize)
@@ -153,12 +163,14 @@ def main():
                 # Get rotational/translation shift
                 hr, ht = estimateHeadPose(landmarks, facePts, camera_matrix, camera_distortion)
                 # Normalization
-                processed_face = normalizeFace(image, face.T, hr, ht, camera_matrix)
+                #processed_face = normalizeFace(image, face.T, hr, ht, camera_matrix)
+                processed_face2 = normalizeFace(image, face.T, hr, ht, camera_matrix)
 
                 # Show camera image with landmarks
                 cv2.imshow("Cam image", image)
                 # Show normalized image
-                cv2.imshow("normalized Image", processed_face)
+                cv2.imshow("normalized Image", processed_face2)
+                #showInMovedWindow("Normalized Image2", processed_face2, 300, 0)
 
             if cv2.waitKey(5) & 0xFF == 27:
                 break
