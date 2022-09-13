@@ -1,0 +1,136 @@
+We introduce Codex, a GPT language model finetuned on publicly available code from GitHub,
+and study its Python code-writing capabilities.
+A distinct production version of Codex powers
+GitHub Copilot. On HumanEval, a new evaluation set we release to measure functional correctness for synthesizing programs from docstrings,
+our model solves 28.8% of the problems, while
+GPT-3 solves 0% and GPT-J solves 11.4%. Furthermore, we find that repeated sampling from the
+model is a surprisingly effective strategy for producing working solutions to difficult prompts. Using this method, we solve 70.2% of our problems
+with 100 samples per problem. 
+
+
+1. Introduction
+
+ our early investigation of GPT-3 (Brown et al.,
+2020) revealed that it could generate simple programs from
+Python docstrings. While rudimentary, this capability was
+exciting because GPT-3 was not explicitly trained for code
+generation. Given the considerable success of large language models in other modalities and the abundance of
+publicly available code, we hypothesized that a specialized
+GPT model, called Codex, could excel at a variety of coding
+tasks. This paper describes several early Codex models,
+whose descendants power GitHub Copilot and the Codex
+models in the OpenAI API.
+
+In this work, we focus on the task of generating standalone Python functions from docstrings, and evaluate the
+correctness of code samples automatically through unit
+tests. This is in contrast to natural language generation,
+where samples are typically evaluated by heuristics or by
+human evaluators. To accurately benchmark our model,
+we create a dataset of 164 original programming problems
+with unit tests. These problems assess language comprehension, algorithms, and simple mathematics, with some
+comparable to simple software interview questions. We
+release this data along with an evaluation framework at
+https://www.github.com/openai/human-eval.
+To solve a problem in our test set, we generate multiple
+samples from the models, and check if any of them pass the
+unit tests. With just a single sample, a 12B parameter Codex
+solves 28.8% of these problems, and a 300M parameter
+Codex solves 13.2% of these problems. In contrast, the 6B
+parameter GPT-J (Wang & Komatsuzaki, 2021) achieves
+11.4% on the same dataset, while all GPT models achieve
+near 0%. To improve our model’s performance at the task of
+function synthesis from docstrings, we fine-tune Codex on
+standalone, correctly implemented functions. The resulting
+model, Codex-S, solves 37.7% of problems with a single
+sample. Figure 2 showcases problems of varying difficulty
+in our dataset, along with correct model generated solutions
+
+Real-world programming tasks often involve iterations of
+approaches and bug fixes, which is approximated by generating many samples from our models and selecting one that
+passes all unit tests. Within 100 samples, Codex-S is able to generate at least one correct function for 77.5% of the problems. This result suggests that accurate code samples can be selected via heuristic ranking instead of fully evaluating
+each sample, the latter of which may not be possible or practical in deployment. Indeed, we find that the sample with
+highest mean log-probability passes unit tests for 44.5% of the problems.
+
+
+2. Evaluation Framework
+
+1) Correctness
+evaluate functional correctness using
+the pass@k metric, where k code samples are generated
+per problem, a problem is considered solved if any sample passes the unit tests, and the total fraction of problems
+solved is reported. However, computing pass@k in this
+way can have high variance. Instead, to evaluate pass@k,
+we generate n ≥ k samples per task (in this paper, we
+use n = 200 and k ≤ 100), count the number of correct
+samples c ≤ n which pass unit tests, and calculate the
+unbiased estimator
+
+2) HumanEval
+We evaluate functional correctness on a set of 164 handwritten programming problems, which we call the HumanEval dataset. Each problem includes a function signature, docstring, body, and several unit tests, with an average of 7.7 tests per problem.
+
+
+3. Code Fine-tuning
+We fine-tune GPT models containing up to 12B parameters
+on code to produce Codex. In contrast with GPT, Codex
+displays non-trivial performance on the HumanEval dataset.
+In fact, Codex is able to solve the majority of the problems
+in HumanEval if we generate and evaluate 100 samples per problem, and pick one that passes unit tests. When limited to
+a budget of one evaluation per problem, producing multiple
+samples with Codex and choosing the one with the highest
+mean log-probability provides significant gains
+
+1) Data Collection
+Our training dataset was collected in May 2020 from 54 million public software repositories hosted on GitHub, containing 179 GB of unique Python files under 1 MB. We filtered
+out files which were likely auto-generated, had average line
+length greater than 100, had maximum line length greater
+than 1000, or contained a small percentage of alphanumeric
+characters. After filtering, our final dataset totaled 159 GB
+
+2) Methods
+Since Codex is evaluated on natural language prompts, we
+hypothesized that it would be beneficial to fine-tune from
+the GPT-3 (Brown et al., 2020) model family, which already
+contains strong natural language representations. Surprisingly, we did not observe improvements when starting from
+a pre-trained language model, possibly because the finetuning dataset is so large. Nevertheless, models fine-tuned
+from GPT converge more quickly, so we apply this strategy
+for all subsequent experiments.
+We train Codex using the same learning rate as the corresponding GPT model, with a 175 step linear warmup and
+cosine learning rate decay. We train for a total of 100 billion
+tokens, using the Adam optimizer with β1 = 0.9, β2 = 0.95,
+ = 10−8
+, and a weight decay coefficient of 0.1.
+
+
+To compute pass@k, we assemble each HumanEval problem into a prompt consisting of a header, a signature, and
+a docstring, which is illustrated in Figure 2. We sample
+tokens from Codex until we encounter one of the following
+stop sequences: ‘\nclass’, ‘\ndef’, ‘\n#’, ‘\nif’, or
+‘\nprint’, since the model will continue generating additional functions or statements otherwise. We use nucleus
+sampling (Holtzman et al., 2020) with top p = 0.95 for all
+sampling evaluation in this work.
+
+3) Results
+
+
+4. Supervised Fine-tuning
+In order to adapt Codex to the distribution of the task of interest, we construct a set of training problems from correctly
+implemented standalone functions, and use them for additional supervised fine-tuning. We describe two approaches
+for collecting these examples: from competitive programming websites and from repositories with continuous integration. We call the supervised fine-tuned models Codex-S,
+and show that they produce consistent gains across model
+size.
+
+5. Limitations
+1) First, Codex is not sample efficient to train
+ Our training
+dataset comprises a significant fraction of publicly available
+Python code on GitHub, totaling hundreds of millions of
+lines of code. Even seasoned developers do not encounter
+anywhere near this amount of code over their careers. Indeed, a strong student who completes an introductory computer science course is expected to be able to solve a larger
+fraction of problems than Codex-12B.
+
+2) Complexity
+Codex can recommend syntactically incorrect or undefined code, and can invoke functions,
+variables, and attributes that are undefined or outside the
+scope of the codebase. Moreover, Codex struggles to parse
+through increasingly long and higher-level or system-level
+specifications.

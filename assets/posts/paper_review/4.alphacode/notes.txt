@@ -1,0 +1,48 @@
+ However, these models still perform poorly when evaluated on more complex, unseen problems that require problem-solving skills beyond simply translating instructions into
+code. For example, competitive programming problems which require an understanding of algorithms
+and complex natural language remain extremely challenging. To address this gap, we introduce AlphaCode, a system for code generation that can create novel solutions to these problems that require deeper
+reasoning
+
+
+1. Introduction
+The difference
+in difficulty between generating short code snippets and entire programs can be analogous to that of
+imperative versus declarative problem solving. Generating short code snippets typically amounts to
+translating the task specification directly into code, and sometimes reduces to invoking the correct
+API calls. In contrast, generating entire programs often relies on understanding the task and figuring
+out how to accomplish it, which requires deeper algorithmic reasoning.
+
+1) Competitive Programming
+
+2) Backspace Problem
+
+3) Evaluation
+DeepMind came up with a generic metric: n@k.
+The metric is defined as the “percentage of problems solved using n submissions from k samples per problem,” and it’s sufficiently similar to the way Codeforces evaluates submissions. AlphaCode is allowed to generate k samples (up to the range of 100K-1M) and from those, the system can submit n solutions (n≤k) to evaluation. AlphaCode is successful if at least one of the n submissions solves the problem.
+
+
+2. AlphaCode
+1) Overview
+- Pre-training: AlphaCode is a transformer-based large language model initially trained on GitHub code repositories
+- Fine-tuning:  DeepMind created a competitive programming dataset named CodeContests to fine-tune and specialize AlphaCode. It compensates for the low amount of public examples of competitive programming problems.
+- Generation (k)
+- Filtering and Clustering (n)
+
+2) Model Architecture
+The authors propose an encoder-decoder model architecture of various sizes (300M, 1.1B, 2.8B, 8.7B, 41.1B). Asymmetric architecture 1536 tokens in encoder, 768 tokens in decoder. SentencePiece tokenizer trained on GitHub + CodeContest dataset with 8,000 tokens. Same tokenizer is used for encoder and decoder, across both programming languages and natural language
+
+3) Datasets
+Pretraing: GitHub Open source code
+Finetuning: CodeContests, custom data set. Fixed false positives (30~60%) by generating additional test cases by mutating existing ones: “randomly incrementing or decrementing integers, and swapping and changing characters in strings.” These tests are then verified with correct solutions. The result was impressive, reducing the false positive rate down to 4%.
+
+4) Sampling, filtering, clustering
+Filtering them on the visible test cases and removing the incorrect solutions.
+
+Filtering removes +99% of the samples, but still leaves thousands of potential submissions. To further reduce the number of samples down to 10, DeepMind researchers came up with a clever process. They made clusters out of the samples, grouping semantically — but not syntactically — equivalent solutions.
+
+To do this they pre-trained a test input generation model with the same architecture as the main models on the same GitHub dataset. The idea was to have the model generate new test inputs for the problem. AlphaCode’s samples could be evaluated on these new tests — not necessarily valid or correct, but useful regardless. Then, evaluated samples were clustered depending on the solutions they gave to the new tests — wrong answers gave even more information than correct ones.
+
+To select the 10 submission samples, they found that selecting one from each cluster from largest to smallest gave them the best performance.
+
+
+3. Results
